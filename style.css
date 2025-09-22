@@ -1,0 +1,502 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    overflow: hidden;
+}
+
+#map {
+    width: 100vw;
+    height: 100vh;
+}
+
+.controls {
+    position: absolute;
+    top: 20px;
+    left: 60px;
+    z-index: 1000;
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.controls button {
+    padding: 8px 16px;
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.3s;
+}
+
+.controls button:hover {
+    background: #45a049;
+}
+
+#clearMarkers {
+    background: #f44336;
+}
+
+#clearMarkers:hover {
+    background: #da190b;
+}
+
+#saveImage {
+    background: #9C27B0;
+}
+
+#saveImage:hover {
+    background: #7B1FA2;
+}
+
+#manageMarkers {
+    background: #FF9800;
+}
+
+#manageMarkers:hover {
+    background: #F57C00;
+}
+
+/* スクリーンショット撮影時に非表示にする要素 */
+.screenshot-mode .controls,
+.screenshot-mode .search-box,
+.screenshot-mode .info-panel,
+.screenshot-mode .marker-dialog {
+    display: none !important;
+}
+
+/* マーカー管理ダイアログ */
+.marker-manager {
+    max-width: 600px;
+    max-height: 80vh;
+}
+
+.manager-actions {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    justify-content: center;
+}
+
+.marker-list {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.marker-item {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    border-bottom: 1px solid #eee;
+    transition: background 0.2s;
+}
+
+.marker-item:last-child {
+    border-bottom: none;
+}
+
+.marker-item:hover {
+    background: #f9f9f9;
+}
+
+.marker-icon-display {
+    font-size: 20px;
+    margin-right: 12px;
+    width: 30px;
+    text-align: center;
+}
+
+.marker-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.marker-info h4 {
+    margin: 0 0 4px 0;
+    color: #333;
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.marker-info p {
+    margin: 0;
+    color: #666;
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.marker-actions {
+    display: flex;
+    gap: 5px;
+    margin-left: 10px;
+}
+
+.marker-actions button {
+    padding: 4px 8px;
+    font-size: 12px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-edit {
+    background: #4CAF50;
+    color: white;
+}
+
+.btn-edit:hover {
+    background: #45a049;
+}
+
+.btn-delete {
+    background: #f44336;
+    color: white;
+}
+
+.btn-delete:hover {
+    background: #da190b;
+}
+
+.btn-goto {
+    background: #2196F3;
+    color: white;
+}
+
+.btn-goto:hover {
+    background: #0b7dda;
+}
+
+.empty-marker-list {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+    font-style: italic;
+}
+
+.info-panel {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    min-width: 200px;
+}
+
+.info-panel h3 {
+    margin-bottom: 10px;
+    color: #333;
+    font-size: 16px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 5px;
+}
+
+.info-panel p {
+    margin: 5px 0;
+    color: #666;
+    font-size: 14px;
+}
+
+.info-panel span {
+    font-weight: bold;
+    color: #333;
+}
+
+/* Leafletのポップアップスタイル調整 */
+.leaflet-popup-content {
+    margin: 10px;
+    font-size: 14px;
+}
+
+.leaflet-popup-content b {
+    display: block;
+    margin-bottom: 5px;
+    color: #2196F3;
+}
+
+/* 検索ボックス */
+.search-box {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    min-width: 300px;
+}
+
+.search-box input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+
+.search-box input:focus {
+    outline: none;
+    border-color: #4CAF50;
+}
+
+.search-box button {
+    width: 100%;
+    padding: 8px 16px;
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.3s;
+}
+
+.search-box button:hover {
+    background: #45a049;
+}
+
+#searchResults {
+    margin-top: 10px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.search-result {
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.search-result:hover {
+    background: #f5f5f5;
+}
+
+.search-result:last-child {
+    border-bottom: none;
+}
+
+.search-result-name {
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 2px;
+}
+
+.search-result-address {
+    font-size: 12px;
+    color: #666;
+}
+
+/* マーカーダイアログ */
+.marker-dialog {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+}
+
+.marker-dialog.active {
+    display: flex;
+}
+
+.dialog-content {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    max-width: 400px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.dialog-content h3 {
+    margin: 0 0 20px 0;
+    color: #333;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #333;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.form-group textarea {
+    min-height: 60px;
+    resize: vertical;
+}
+
+.icon-selector {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.icon-option {
+    padding: 8px;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 14px;
+}
+
+.icon-option:hover {
+    border-color: #4CAF50;
+    background: #f5f5f5;
+}
+
+.icon-option.selected {
+    border-color: #4CAF50;
+    background: #e8f5e8;
+    color: #2e7d32;
+}
+
+.dialog-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    justify-content: flex-end;
+}
+
+.dialog-buttons button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.2s;
+}
+
+.btn-primary {
+    background: #4CAF50;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #45a049;
+}
+
+.btn-secondary {
+    background: #757575;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #616161;
+}
+
+.btn-danger {
+    background: #f44336;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #da190b;
+}
+
+/* カスタムマーカーのスタイル */
+.custom-marker-with-label {
+    position: relative;
+}
+
+.marker-container {
+    position: relative;
+    width: 30px;
+    height: 55px; /* ラベル分の高さを確保 */
+}
+
+.marker-label {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+/* モバイル対応 */
+@media (max-width: 600px) {
+    .controls {
+        top: 70px;
+        left: 10px;
+        right: 10px;
+        padding: 10px;
+    }
+
+    .controls button {
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+
+    .search-box {
+        top: 130px;
+        left: 10px;
+        right: 10px;
+        min-width: auto;
+    }
+
+    .info-panel {
+        bottom: 10px;
+        right: 10px;
+        left: 10px;
+        min-width: auto;
+    }
+
+    .dialog-content {
+        width: 95%;
+        max-height: 90vh;
+    }
+
+    .icon-selector {
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    }
+
+    .dialog-buttons {
+        flex-direction: column;
+    }
+}
