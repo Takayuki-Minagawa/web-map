@@ -52,6 +52,12 @@
         star: { emoji: '⭐', color: '#FFC107', label: 'お気に入り' }
     };
 
+    function getValidIconType(iconType) {
+        return Object.prototype.hasOwnProperty.call(MARKER_ICONS, iconType)
+            ? iconType
+            : 'default';
+    }
+
     // DOM要素のキャッシュ
     const elements = {};
 
@@ -79,7 +85,8 @@
                 maxZoom: 19,
                 attribution: '© OpenStreetMap contributors',
                 updateWhenIdle: true,
-                updateWhenZooming: false
+                updateWhenZooming: false,
+                crossOrigin: true
             }).addTo(map);
 
             // イベントリスナーの設定
@@ -113,6 +120,7 @@
     // DOM要素をキャッシュ
     function cacheElements() {
         elements.clickLocation = document.getElementById('clickLocation');
+        elements.meshCode = document.getElementById('meshCode');
         elements.zoomLevel = document.getElementById('zoomLevel');
         elements.controls = document.querySelector('.controls');
         elements.zoomToTokyo = document.getElementById('zoomToTokyo');
@@ -240,11 +248,19 @@
             return;
         }
 
-        const lat = e.latlng.lat.toFixed(4);
-        const lng = e.latlng.lng.toFixed(4);
+        const lat = e.latlng.lat;
+        const lng = e.latlng.lng;
+        const latFormatted = lat.toFixed(6);
+        const lngFormatted = lng.toFixed(6);
 
-        // テキスト更新（リフローを最小化）
-        elements.clickLocation.textContent = `${lat}, ${lng}`;
+        // 緯度経度を表示
+        elements.clickLocation.textContent = `${latFormatted}, ${lngFormatted}`;
+
+        // メッシュコードを計算して表示
+        const meshCode = calculateMeshCode(lat, lng);
+        if (elements.meshCode) {
+            elements.meshCode.textContent = meshCode;
+        }
 
         // マーカーカスタマイズダイアログを開く
         openMarkerDialog(e.latlng);
@@ -1150,7 +1166,7 @@
         const title = elements.markerTitle.value.trim();
         const description = elements.markerDescription.value.trim();
         const selectedIcon = document.querySelector('.icon-option.selected');
-        const iconType = selectedIcon ? selectedIcon.dataset.icon : 'default';
+        const iconType = getValidIconType(selectedIcon ? selectedIcon.dataset.icon : 'default');
 
         if (!title) {
             alert('タイトルを入力してください');
@@ -1176,19 +1192,36 @@
     }
 
     // 新規マーカーを作成
-    function createNewMarker(latlng, customData) {
-        // IDが未設定の場合は新しいIDを割り当て
-        if (!customData.id) {
-            customData.id = nextMarkerId++;
+    function createNewMarker(latlng, customData = {}) {
+        const rawId = Number(customData.id);
+        let markerId = Number.isFinite(rawId) && rawId > 0 ? rawId : null;
+
+        if (markerId == null) {
+            markerId = nextMarkerId++;
+        } else {
+            nextMarkerId = Math.max(nextMarkerId, markerId + 1);
         }
 
-        const icon = createCustomIcon(customData.iconType, customData.title);
+        const iconType = getValidIconType(customData.iconType);
+        const markerData = {
+            ...customData,
+            id: markerId,
+            iconType,
+            emoji: MARKER_ICONS[iconType].emoji,
+            title: customData.title || ''
+        };
+
+        const icon = createCustomIcon(markerData.iconType, markerData.title);
 
         const marker = L.marker(latlng, { icon })
             .addTo(map);
 
         // カスタムデータを保存
-        marker.customData = { ...customData, lat: latlng.lat, lng: latlng.lng };
+        marker.customData = {
+            ...markerData,
+            lat: latlng.lat,
+            lng: latlng.lng
+        };
 
         // ポップアップを設定
         updateMarkerPopup(marker);
@@ -1211,13 +1244,26 @@
     }
 
     // 既存マーカーを更新
-    function updateExistingMarker(marker, customData) {
-        const icon = createCustomIcon(customData.iconType, customData.title);
-        marker.setIcon(icon);
-
-        // 位置情報を保持
+    function updateExistingMarker(marker, customData = {}) {
         const latlng = marker.getLatLng();
-        marker.customData = { ...customData, lat: latlng.lat, lng: latlng.lng };
+        const iconType = getValidIconType(customData.iconType ?? marker.customData?.iconType);
+        const normalized = {
+            ...marker.customData,
+            ...customData,
+            iconType,
+            title: (customData.title ?? marker.customData?.title ?? ''),
+            emoji: MARKER_ICONS[iconType].emoji,
+            lat: latlng.lat,
+            lng: latlng.lng
+        };
+
+        const icon = createCustomIcon(normalized.iconType, normalized.title);
+        marker.setIcon(icon);
+        marker.customData = normalized;
+
+        if (Number.isFinite(Number(normalized.id))) {
+            nextMarkerId = Math.max(nextMarkerId, Number(normalized.id) + 1);
+        }
 
         updateMarkerPopup(marker);
 
@@ -1233,8 +1279,9 @@
 
     // カスタムアイコンを作成（タイトル表示付き）
     function createCustomIcon(iconType, title) {
-        const iconData = MARKER_ICONS[iconType];
-        const safeTitle = escapeHTML(title);
+        const safeType = getValidIconType(iconType);
+        const iconData = MARKER_ICONS[safeType];
+        const safeTitle = escapeHTML(title || '');
 
         return L.divIcon({
             html: `<div class="marker-container">
@@ -1362,23 +1409,33 @@
                     const latOk = Number.isFinite(Number(data.lat));
                     const lngOk = Number.isFinite(Number(data.lng));
                     if (latOk && lngOk && data.title) {
-                        // IDの補完と最大IDの更新
-                        if (typeof data.id !== 'number' || !Number.isFinite(data.id)) {
-                            data.id = ++maxId;
+                        const latlng = L.latLng(Number(data.lat), Number(data.lng));
+                        const parsedId = Number(data.id);
+                        let markerId;
+                        if (Number.isFinite(parsedId) && parsedId > 0) {
+                            markerId = parsedId;
+                            maxId = Math.max(maxId, markerId);
                         } else {
-                            maxId = Math.max(maxId, data.id);
+                            maxId += 1;
+                            markerId = maxId;
                         }
 
-                        const latlng = L.latLng(Number(data.lat), Number(data.lng));
+                        const iconType = getValidIconType(data.iconType);
+                        const markerDataNormalized = {
+                            ...data,
+                            id: markerId,
+                            iconType,
+                            emoji: MARKER_ICONS[iconType].emoji,
+                            title: data.title || ''
+                        };
 
-                        const icon = createCustomIcon(data.iconType || 'default', data.title);
+                        const icon = createCustomIcon(markerDataNormalized.iconType, markerDataNormalized.title);
                         const marker = L.marker(latlng, { icon }).addTo(map);
 
-                        const iconType = data.iconType || 'default';
                         marker.customData = {
-                            ...data,
-                            iconType,
-                            emoji: MARKER_ICONS[iconType]?.emoji || data.emoji || '📍'
+                            ...markerDataNormalized,
+                            lat: latlng.lat,
+                            lng: latlng.lng
                         };
                         updateMarkerPopup(marker);
 
@@ -1392,7 +1449,7 @@
 
                 // 次のIDを設定
                 if (maxId > 0) {
-                    nextMarkerId = maxId + 1;
+                    nextMarkerId = Math.max(nextMarkerId, maxId + 1);
                 }
 
                 console.log('保存されたマーカーを読み込みました:', markers.length + '件');
@@ -1820,6 +1877,46 @@
 
             container.appendChild(div);
         });
+    }
+
+    // 3次メッシュコード（1/2メッシュ・9桁）を計算
+    function calculateMeshCode(lat, lng) {
+        // 緯度経度から地域メッシュコードを計算
+        // 参考：https://www.stat.go.jp/data/mesh/pdf/gaiyo1.pdf
+
+        // 1次メッシュ（4桁）
+        const p = Math.floor(lat * 1.5);
+        const u = Math.floor(lng - 100);
+        const firstMesh = String(p) + String(u);
+
+        // 2次メッシュ（6桁）
+        const q = Math.floor((lat * 1.5 - p) * 8);
+        const v = Math.floor((lng - 100 - u) * 8);
+        const secondMesh = firstMesh + String(q) + String(v);
+
+        // 3次メッシュ（8桁）
+        const r = Math.floor((lat * 1.5 - p - q / 8) * 80);
+        const w = Math.floor((lng - 100 - u - v / 8) * 80);
+        const thirdMesh = secondMesh + String(r) + String(w);
+
+        // 1/2メッシュ（9桁）
+        // 3次メッシュを2×2に分割
+        const s = Math.floor((lat * 1.5 - p - q / 8 - r / 80) * 160);
+        const x = Math.floor((lng - 100 - u - v / 8 - w / 80) * 160);
+
+        // 1/2メッシュのコード (1:南西, 2:南東, 3:北西, 4:北東)
+        let halfMeshCode;
+        if (s < 1 && x < 1) {
+            halfMeshCode = 1;
+        } else if (s < 1 && x >= 1) {
+            halfMeshCode = 2;
+        } else if (s >= 1 && x < 1) {
+            halfMeshCode = 3;
+        } else {
+            halfMeshCode = 4;
+        }
+
+        return thirdMesh + String(halfMeshCode);
     }
 
     // デバウンス関数
