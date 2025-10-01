@@ -26,6 +26,7 @@ body {
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
+    align-items: center;
 }
 
 .controls button {
@@ -43,6 +44,34 @@ body {
     background: #45a049;
 }
 
+.controls select {
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+    background: #fff;
+    color: #333;
+    cursor: pointer;
+    min-width: 140px;
+}
+
+.controls select:focus {
+    outline: none;
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+}
+
+.controls button.active {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6) inset;
+}
+
+.controls button:disabled,
+.controls button:disabled:hover {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: #9E9E9E;
+}
+
 #clearMarkers {
     background: #f44336;
 }
@@ -51,12 +80,87 @@ body {
     background: #da190b;
 }
 
+#markerFilterReset {
+    background: #90A4AE;
+    color: white;
+}
+
+#markerFilterReset:hover {
+    background: #78909C;
+}
+
 #saveImage {
     background: #9C27B0;
 }
 
 #saveImage:hover {
     background: #7B1FA2;
+}
+
+#routeStart {
+    background: #3F51B5;
+}
+
+#routeStart:hover {
+    background: #303F9F;
+}
+
+#routeEnd {
+    background: #673AB7;
+}
+
+#routeEnd:hover {
+    background: #512DA8;
+}
+
+#routeShow {
+    background: #795548;
+}
+
+#routeShow:hover {
+    background: #5D4037;
+}
+
+#routeClear {
+    background: #9E9E9E;
+    color: #212121;
+}
+
+#routeClear:hover {
+    background: #757575;
+    color: #fff;
+}
+
+#measureDistance {
+    background: #009688;
+}
+
+#measureDistance:hover {
+    background: #00796B;
+}
+
+#measureArea {
+    background: #E91E63;
+}
+
+#measureArea:hover {
+    background: #C2185B;
+}
+
+#measureClear {
+    background: #607D8B;
+}
+
+#measureClear:hover {
+    background: #455A64;
+}
+
+#locateMe {
+    background: #2196F3;
+}
+
+#locateMe:hover {
+    background: #1976D2;
 }
 
 #manageMarkers {
@@ -220,6 +324,14 @@ body {
 .info-panel span {
     font-weight: bold;
     color: #333;
+}
+
+.info-panel span.status-success {
+    color: #1976D2;
+}
+
+.info-panel span.status-error {
+    color: #f44336;
 }
 
 /* Leafletのポップアップスタイル調整 */
@@ -471,6 +583,10 @@ body {
     .controls button {
         padding: 6px 12px;
         font-size: 12px;
+    }
+
+    .controls select {
+        width: 100%;
     }
 
     .search-box {

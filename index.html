@@ -23,6 +23,18 @@
         <button id="zoomToOsaka">大阪</button>
         <button id="zoomToKyoto">京都</button>
         <button id="clearMarkers">マーカーをクリア</button>
+        <select id="markerFilter" aria-label="マーカーフィルター">
+            <option value="all">すべて表示</option>
+        </select>
+        <button id="markerFilterReset">フィルター解除</button>
+        <button id="routeStart">🚩 出発地</button>
+        <button id="routeEnd">🏁 到着地</button>
+        <button id="routeShow">🛣️ ルート表示</button>
+        <button id="routeClear">✖ ルートクリア</button>
+        <button id="measureDistance">📏 距離計測</button>
+        <button id="measureArea">🗾 面積計測</button>
+        <button id="measureClear">✖ 計測リセット</button>
+        <button id="locateMe">📍 現在地</button>
         <button id="saveImage">📷 画像保存</button>
         <button id="manageMarkers">📋 マーカー管理</button>
     </div>
@@ -37,6 +49,10 @@
         <h3>地図情報</h3>
         <p>クリック位置: <span id="clickLocation">-</span></p>
         <p>ズームレベル: <span id="zoomLevel">-</span></p>
+        <p>現在地: <span id="currentLocation">未取得</span></p>
+        <p>計測結果: <span id="measurementResult">-</span></p>
+        <p>マーカー表示: <span id="markerFilterStatus">-</span></p>
+        <p>ルート: <span id="routeResult">-</span></p>
     </div>
 
     <!-- マーカーカスタマイズダイアログ -->
