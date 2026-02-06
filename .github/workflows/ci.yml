@@ -1,0 +1,123 @@
+name: CI & Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# GitHub Pages デプロイ用の権限設定
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同時実行を防ぐ
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  # コードチェック
+  lint:
+    name: Code Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install linters
+        run: |
+          npm install -g htmlhint stylelint stylelint-config-standard eslint @eslint/js
+
+      - name: Create ESLint config
+        run: |
+          cat > eslint.config.mjs << 'EOF'
+          import js from "@eslint/js";
+          export default [
+            js.configs.recommended,
+            {
+              languageOptions: {
+                ecmaVersion: 2022,
+                sourceType: "script",
+                globals: {
+                  window: "readonly",
+                  document: "readonly",
+                  console: "readonly",
+                  alert: "readonly",
+                  confirm: "readonly",
+                  localStorage: "readonly",
+                  navigator: "readonly",
+                  L: "readonly",
+                  html2canvas: "readonly",
+                  Blob: "readonly",
+                  URL: "readonly",
+                  FileReader: "readonly",
+                  setTimeout: "readonly",
+                  clearTimeout: "readonly"
+                }
+              },
+              rules: {
+                "no-unused-vars": "warn",
+                "no-undef": "error"
+              }
+            }
+          ];
+          EOF
+
+      - name: Create StyleLint config
+        run: |
+          cat > .stylelintrc.json << 'EOF'
+          {
+            "extends": "stylelint-config-standard",
+            "rules": {
+              "no-descending-specificity": null,
+              "selector-class-pattern": null
+            }
+          }
+          EOF
+
+      - name: Lint HTML
+        run: htmlhint "*.html" --ignore="node_modules/**"
+        continue-on-error: true
+
+      - name: Lint CSS
+        run: stylelint "*.css" --ignore-pattern="node_modules/**"
+        continue-on-error: true
+
+      - name: Lint JavaScript
+        run: npx eslint "*.js" --ignore-pattern="node_modules/**"
+        continue-on-error: true
+
+      - name: Check completed
+        run: echo "✅ Code check completed!"
+
+  # GitHub Pages へデプロイ
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: lint
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

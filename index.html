@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebMap - シンプル地図アプリ</title>
+    <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAOXudfoAAAAASUVORK5CYII=">
+
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://unpkg.com">
+    <link rel="preconnect" href="https://tile.openstreetmap.org">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="map"></div>
+
+    <div class="controls">
+        <button id="zoomToTokyo">東京</button>
+        <button id="zoomToOsaka">大阪</button>
+        <button id="zoomToKyoto">京都</button>
+        <button id="clearMarkers">マーカーをクリア</button>
+        <select id="markerFilter" aria-label="マーカーフィルター">
+            <option value="all">すべて表示</option>
+        </select>
+        <button id="markerFilterReset">フィルター解除</button>
+        <button id="routeStart">🚩 出発地</button>
+        <button id="routeEnd">🏁 到着地</button>
+        <button id="routeShow">🛣️ ルート表示</button>
+        <button id="routeClear">✖ ルートクリア</button>
+        <button id="measureDistance">📏 距離計測</button>
+        <button id="measureArea">🗾 面積計測</button>
+        <button id="measureClear">✖ 計測リセット</button>
+        <button id="locateMe">📍 現在地</button>
+        <button id="saveImage">📷 画像保存</button>
+        <button id="manageMarkers">📋 マーカー管理</button>
+    </div>
+
+    <div class="search-box">
+        <input type="text" id="addressInput" placeholder="住所を入力（例：東京駅、渋谷区、京都市役所）" />
+        <button id="searchButton">検索</button>
+        <div id="searchResults"></div>
+    </div>
+
+    <div class="info-panel">
+        <h3>地図情報</h3>
+        <p>クリック位置: <span id="clickLocation">-</span></p>
+        <p>メッシュコード: <span id="meshCode">-</span></p>
+        <p>ズームレベル: <span id="zoomLevel">-</span></p>
+        <p>現在地: <span id="currentLocation">未取得</span></p>
+        <p>計測結果: <span id="measurementResult">-</span></p>
+        <p>マーカー表示: <span id="markerFilterStatus">-</span></p>
+        <p>ルート: <span id="routeResult">-</span></p>
+    </div>
+
+    <!-- マーカーカスタマイズダイアログ -->
+    <div id="markerDialog" class="marker-dialog">
+        <div class="dialog-content">
+            <h3>マーカーの設定</h3>
+            <div class="form-group">
+                <label>タイトル:</label>
+                <input type="text" id="markerTitle" placeholder="マーカーのタイトルを入力" />
+            </div>
+            <div class="form-group">
+                <label>説明:</label>
+                <textarea id="markerDescription" placeholder="マーカーの説明を入力（任意）"></textarea>
+            </div>
+            <div class="form-group">
+                <label>アイコン:</label>
+                <div class="icon-selector">
+                    <div class="icon-option" data-icon="default">📍 デフォルト</div>
+                    <div class="icon-option" data-icon="home">🏠 家</div>
+                    <div class="icon-option" data-icon="work">🏢 職場</div>
+                    <div class="icon-option" data-icon="food">🍽️ レストラン</div>
+                    <div class="icon-option" data-icon="shop">🛒 ショップ</div>
+                    <div class="icon-option" data-icon="hospital">🏥 病院</div>
+                    <div class="icon-option" data-icon="school">🏫 学校</div>
+                    <div class="icon-option" data-icon="park">🌳 公園</div>
+                    <div class="icon-option" data-icon="star">⭐ お気に入り</div>
+                </div>
+            </div>
+            <div class="dialog-buttons">
+                <button id="saveMarker" class="btn-primary">保存</button>
+                <button id="cancelMarker" class="btn-secondary">キャンセル</button>
+                <button id="deleteMarker" class="btn-danger" style="display: none;">削除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- マーカー管理ダイアログ -->
+    <div id="markerManagerDialog" class="marker-dialog">
+        <div class="dialog-content marker-manager">
+            <h3>マーカー管理</h3>
+            <div class="manager-actions">
+                <button id="exportMarkers" class="btn-secondary">📤 エクスポート</button>
+                <button id="importMarkers" class="btn-secondary">📥 インポート</button>
+                <input type="file" id="importFile" accept=".json" style="display: none;">
+            </div>
+
+            <div id="markerList" class="marker-list">
+                <!-- マーカーリストがここに表示される -->
+            </div>
+
+            <div class="dialog-buttons">
+                <button id="closeMarkerManager" class="btn-secondary">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- HTML2Canvas for screenshot -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <!-- Custom JavaScript with async -->
+    <script src="map.js" defer></script>
+</body>
+</html>
