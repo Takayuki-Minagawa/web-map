@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- 背景 -->
+  <rect width="100" height="100" fill="#4A90E2" rx="20"/>
+
+  <!-- 地図ピン -->
+  <g transform="translate(50, 30)">
+    <!-- ピンの本体 -->
+    <path d="M 0,-20 Q -15,-20 -20,-5 Q -20,5 0,30 Q 20,5 20,-5 Q 15,-20 0,-20 Z"
+          fill="#FF4757"
+          stroke="#fff"
+          stroke-width="2"/>
+
+    <!-- ピンの中心の円 -->
+    <circle cx="0" cy="-5" r="6" fill="#fff"/>
+  </g>
+
+  <!-- 下部の地図線（装飾） -->
+  <g opacity="0.3">
+    <line x1="15" y1="75" x2="40" y2="75" stroke="#fff" stroke-width="2"/>
+    <line x1="60" y1="75" x2="85" y2="75" stroke="#fff" stroke-width="2"/>
+    <line x1="25" y1="85" x2="50" y2="85" stroke="#fff" stroke-width="2"/>
+    <line x1="55" y1="85" x2="75" y2="85" stroke="#fff" stroke-width="2"/>
+  </g>
+</svg>
