@@ -20,7 +20,7 @@ Leafletを用いた地図表示・地点管理・ルート検索が可能なWeb�
 
 ## デモ
 
-🔗 **[WebMapを使ってみる](https://your-username.github.io/web-map-main/)**
+🔗 **[WebMapを使ってみる](https://takayuki-minagawa.github.io/web-map/)**
 
 ※ GitHub Pagesで公開中
 
@@ -70,7 +70,7 @@ WebMapは、地図上でのマーカー管理、ルート検索、距離・面�
 
 GitHub Pagesで公開中のため、ブラウザでアクセスするだけで利用できます。
 
-1. [デモサイト](https://your-username.github.io/web-map-main/)にアクセス
+1. [デモサイト](https://takayuki-minagawa.github.io/web-map/)にアクセス
 2. 地図上をクリックしてマーカーを追加
 3. 各種ボタンから機能を利用
 
@@ -80,8 +80,8 @@ GitHub Pagesで公開中のため、ブラウザでアクセスするだけで�
 
 ```bash
 # リポジトリをクローン
-git clone https://github.com/your-username/web-map-main.git
-cd web-map-main
+git clone https://github.com/Takayuki-Minagawa/web-map.git
+cd web-map
 
 # Pythonサーバーを起動
 python3 server.py
@@ -121,7 +121,7 @@ python3 server.py
 
 ## コントリビューション
 
-バグ報告や機能提案は[Issues](https://github.com/your-username/web-map-main/issues)へお願いします。
+バグ報告や機能提案は[Issues](https://github.com/Takayuki-Minagawa/web-map/issues)へお願いします。
 プルリクエストも歓迎します。
 
 ---
