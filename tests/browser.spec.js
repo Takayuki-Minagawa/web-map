@@ -163,6 +163,97 @@ test('rejects null import records and preserves data when browser storage is ful
     await expect(page.locator('#markerFilterStatus')).toContainText('(1/1)');
 });
 
+test('loads legacy world-copy longitudes without rewriting storage until the next save', async ({ page }) => {
+    const legacyMarker = { ...seedMarker, lng: 181 };
+    const originalStorage = JSON.stringify([legacyMarker]);
+    await openMap(page, [legacyMarker]);
+    await expect(page.locator('#markerFilterStatus')).toContainText('(1/1)');
+    expect(await page.evaluate(() => localStorage.getItem('webmap_markers'))).toBe(originalStorage);
+    await page.locator('#manageMarkers').click();
+    await expect(page.locator('.marker-item')).toHaveCount(1);
+    await expect(page.locator('.marker-item')).toContainText(seedMarker.title);
+    const downloadPromise = page.waitForEvent('download');
+    await page.locator('#exportGeoJSON').click();
+    const download = await downloadPromise;
+    const exported = JSON.parse(await readFile(await download.path(), 'utf8'));
+    expect(exported.features).toHaveLength(1);
+    expect(exported.features[0].geometry.coordinates).toEqual([-179, seedMarker.lat]);
+    expect(await page.evaluate(() => localStorage.getItem('webmap_markers'))).toBe(originalStorage);
+
+    await page.locator('#closeMarkerManager').click();
+    await createMarker(page, '次の保存で追加する地点');
+    const saved = await readMarkers(page);
+    expect(saved).toHaveLength(2);
+    expect(saved[0]).toMatchObject({ ...seedMarker, lng: -179 });
+    expect(saved[1].title).toBe('次の保存で追加する地点');
+});
+
+test('protects unreadable saved data until an explicit valid import restores persistence', async ({ page }) => {
+    const unreadableMarkers = [seedMarker, null];
+    const originalStorage = JSON.stringify(unreadableMarkers);
+    const warnings = [];
+    page.on('dialog', dialog => warnings.push(dialog.message()));
+    await openMap(page, unreadableMarkers);
+    expect(warnings.some(message => /保存済み.*読み込めません/.test(message))).toBe(true);
+    expect(await page.evaluate(() => localStorage.getItem('webmap_markers'))).toBe(originalStorage);
+
+    await createMarker(page, '復旧前の一時的な地点');
+    expect(await page.evaluate(() => localStorage.getItem('webmap_markers'))).toBe(originalStorage);
+    await page.locator('#clearMarkers').click();
+    await expect(page.locator('#markerFilterStatus')).toContainText('(0/0)');
+    expect(await page.evaluate(() => localStorage.getItem('webmap_markers'))).toBe(originalStorage);
+    await page.locator('#manageMarkers').click();
+    await importFile(page, [seedMarker]);
+    await expect(page.locator('.marker-item')).toHaveCount(1);
+    await expect(page.locator('.marker-item')).toContainText(seedMarker.title);
+    expect(await readMarkers(page)).toEqual([expect.objectContaining(seedMarker)]);
+
+    await page.locator('#closeMarkerManager').click();
+    await createMarker(page, '復旧後に保存する地点', 'park', { x: 850, y: 600 });
+    const saved = await readMarkers(page);
+    expect(saved.map(marker => marker.title)).toEqual([seedMarker.title, '復旧後に保存する地点']);
+    expect(saved.every(marker => marker && Number.isFinite(marker.lat) && Number.isFinite(marker.lng))).toBe(true);
+});
+
+test('creating and editing markers on a world copy keeps the visible marker and bounded GeoJSON', async ({ page }) => {
+    // Capture the Leaflet map only in this served test response; production code
+    // does not expose internal state just to support tests.
+    const application = await readFile(resolve('map.js'), 'utf8');
+    await page.route(`${origin}/map.js`, route => route.fulfill({
+        contentType: 'application/javascript',
+        body: `L.Map.addInitHook(function() { window.__testMap = this; });\n${application}`
+    }));
+    await openMap(page);
+    await page.evaluate(() => window.__testMap.setView([35, 181], 5, { animate: false }));
+    await expect(page.locator('#zoomLevel')).toHaveText('5');
+    await createMarker(page, '日付変更線を越えた地点');
+    const marker = page.locator('.custom-marker-with-label');
+    await expect(marker).toHaveCount(1);
+    await expect(marker).toBeInViewport({ ratio: 1 });
+    const savedLongitude = (await readMarkers(page))[0].lng;
+    // Leaflet rounds projected pixels, so a real center click can differ slightly.
+    expect(savedLongitude).toBeCloseTo(-179, 1);
+    expect(savedLongitude).toBeGreaterThanOrEqual(-180);
+    expect(savedLongitude).toBeLessThanOrEqual(180);
+
+    await marker.click();
+    await expect(page.locator('#markerDialog')).toHaveClass(/active/);
+    await page.locator('#markerTitle').fill('編集した世界周回地点');
+    await page.locator('#saveMarker').click();
+    await expect(page.locator('#markerDialog')).not.toHaveClass(/active/);
+    await expect(marker).toBeInViewport({ ratio: 1 });
+    expect((await readMarkers(page))[0].lng).toBe(savedLongitude);
+
+    await page.locator('#manageMarkers').click();
+    const downloadPromise = page.waitForEvent('download');
+    await page.locator('#exportGeoJSON').click();
+    const download = await downloadPromise;
+    const exported = JSON.parse(await readFile(await download.path(), 'utf8'));
+    expect(exported.features[0].properties.title).toBe('編集した世界周回地点');
+    expect(exported.features[0].geometry.coordinates[0]).toBeGreaterThanOrEqual(-180);
+    expect(exported.features[0].geometry.coordinates[0]).toBeLessThanOrEqual(180);
+});
+
 test('exports standard GeoJSON and imports it back with metadata and coordinates', async ({ page }) => {
     await openMap(page, [seedMarker, { id: 2, title: '非表示の公園', description: '',
         iconType: 'park', lat: 35.7, lng: 139.8 }]);

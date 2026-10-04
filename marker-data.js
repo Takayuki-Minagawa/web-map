@@ -20,8 +20,12 @@
         return value;
     }
 
+    function wrapLongitude(lng) {
+        return lng >= -180 && lng <= 180 ? lng : ((lng + 180) % 360 + 360) % 360 - 180;
+    }
+
     // Validate the entire document before callers mutate their map or storage.
-    function normalizeMarkers(payload) {
+    function normalizeMarkers(payload, { wrapLegacyLongitude = false } = {}) {
         const geoJSON = isRecord(payload) && payload.type === 'FeatureCollection';
         const rows = geoJSON ? payload.features : payload;
         if (!Array.isArray(rows)) throw new Error('マーカーのJSON配列またはGeoJSON FeatureCollectionを選択してください');
@@ -50,6 +54,15 @@
                 if (geoJSON && (title == null || title === '')) title = data.name ?? `地点 ${index + 1}`;
                 if (typeof title !== 'string' || !title.trim()) throw new Error('空でないタイトルを指定してください');
                 if (data.description != null && typeof data.description !== 'string') throw new Error('説明は文字列で指定してください');
+
+                // Older versions saved Leaflet world-copy longitudes without wrapping.
+                // Only migrate local storage; imported files still require valid coordinates.
+                if (wrapLegacyLongitude && !geoJSON) {
+                    if (typeof lng === 'string' && lng.trim() !== '') lng = Number(lng);
+                    if (typeof lng === 'number' && Number.isFinite(lng) && Math.abs(lng) > 180) {
+                        lng = wrapLongitude(lng);
+                    }
+                }
 
                 return {
                     id: data.id ?? (geoJSON ? row.id : undefined),
@@ -102,5 +115,5 @@
         };
     }
 
-    return { normalizeMarkers, toGeoJSON };
+    return { normalizeMarkers, toGeoJSON, wrapLongitude };
 });

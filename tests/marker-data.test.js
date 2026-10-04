@@ -67,3 +67,12 @@ test('GeoJSON rejects non-points, malformed properties and nonnumeric positions'
         assert.throws(() => normalizeMarkers({ type: 'FeatureCollection', features: [feature] }), /1件目/);
     }
 });
+
+test('migrates stored legacy world-copy longitudes without relaxing file import validation', () => {
+    const rows = [139, 181, -181, 540, -540].map((lng, i) => ({ title: `地点${i}`, lat: 35, lng }));
+    const before = JSON.stringify(rows);
+    const migrated = normalizeMarkers(rows, { wrapLegacyLongitude: true });
+    assert.deepEqual(migrated.map(row => row.lng), [139, -179, 179, -180, -180]);
+    assert.equal(JSON.stringify(rows), before);
+    assert.throws(() => normalizeMarkers(rows), /無効/);
+});

@@ -10,6 +10,7 @@
     const tempMarkers = [];
     let currentEditingMarker = null;
     let nextMarkerId = 1;
+    let unreadableSavedMarkers = false;
     let userLocationMarker = null;
     let userAccuracyCircle = null;
     let measurementMode = null; // 'distance' | 'area' | null
@@ -1218,10 +1219,9 @@
         const icon = createCustomIcon(markerData.iconType, markerData.title);
 
         // Leaflet allows world copies; keep exported coordinates inside RFC 7946 bounds.
-        const longitude = latlng.lng >= -180 && latlng.lng <= 180
-            ? latlng.lng
-            : ((latlng.lng + 180) % 360 + 360) % 360 - 180;
-        const marker = L.marker(L.latLng(latlng.lat, longitude), { icon });
+        const longitude = WebMapData.wrapLongitude(latlng.lng);
+        // Preserve the clicked world copy on screen; only persisted coordinates wrap.
+        const marker = L.marker(latlng, { icon });
 
         // カスタムデータを保存
         marker.customData = {
@@ -1265,7 +1265,7 @@
             title: (customData.title ?? marker.customData?.title ?? ''),
             emoji: MARKER_ICONS[iconType].emoji,
             lat: latlng.lat,
-            lng: latlng.lng
+            lng: WebMapData.wrapLongitude(latlng.lng)
         };
 
         const icon = createCustomIcon(normalized.iconType, normalized.title);
@@ -1399,10 +1399,15 @@
     }
 
     // マーカーをローカルストレージに保存
-    function saveMarkersToStorage(markerList = markers) {
+    function saveMarkersToStorage(markerList = markers, { replaceUnreadable = false } = {}) {
+        if (unreadableSavedMarkers && !replaceUnreadable) {
+            alert('読み込めない保存データを保護するため、自動保存を停止しています。現在の表示内容はエクスポートできます。有効なファイルをインポートすると保存データを置き換えて再開します。');
+            return false;
+        }
         try {
             const markerData = markerList.map(marker => marker.customData);
             localStorage.setItem('webmap_markers', JSON.stringify(markerData));
+            unreadableSavedMarkers = false;
             console.log('マーカーデータを保存しました:', markerData.length + '件');
             return true;
         } catch (error) {
@@ -1417,7 +1422,7 @@
         try {
             const savedData = localStorage.getItem('webmap_markers');
             if (savedData) {
-                const markerData = WebMapData.normalizeMarkers(JSON.parse(savedData));
+                const markerData = WebMapData.normalizeMarkers(JSON.parse(savedData), { wrapLegacyLongitude: true });
                 const prepared = markerData.map(data => createNewMarker(L.latLng(data.lat, data.lng), data, { register: false }));
                 prepared.forEach(marker => {
                     marker.addTo(map);
@@ -1427,8 +1432,9 @@
                 console.log('保存されたマーカーを読み込みました:', markers.length + '件');
             }
         } catch (error) {
+            unreadableSavedMarkers = true;
             console.error('マーカーデータの読み込みに失敗:', error);
-            alert(`保存済みマーカーを読み込めませんでした。元の保存データは変更していません。${error.message}`);
+            alert(`保存済みマーカーを読み込めませんでした。元の保存データを保護するため自動保存を停止しています。有効なファイルをインポートすると置き換えて再開します。${error.message}`);
         }
 
         applyMarkerFilter(currentMarkerFilter, {
@@ -1610,7 +1616,7 @@
                 const prepared = importedData.map(data => createNewMarker(L.latLng(data.lat, data.lng), data, { register: false }));
 
                 // Commit once. Validation or persistence failure leaves all existing markers intact.
-                if (!saveMarkersToStorage(prepared)) return;
+                if (!saveMarkersToStorage(prepared, { replaceUnreadable: true })) return;
                 markers.forEach(marker => map.removeLayer(marker));
                 markers.length = 0;
                 prepared.forEach(marker => {
