@@ -1,0 +1,4 @@
+{
+  "searchUrl": "https://nominatim.openstreetmap.org/search",
+  "routeUrl": "https://router.project-osrm.org/route/v1/driving"
+}
