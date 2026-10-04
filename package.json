@@ -1,0 +1,21 @@
+{
+  "name": "web-map",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Leaflet map with local marker management and GeoJSON exchange",
+  "scripts": {
+    "lint": "eslint . --max-warnings=0",
+    "test": "node --test tests/*.test.js",
+    "test:browser": "playwright test",
+    "build:pages": "node scripts/build-pages.js"
+  },
+  "engines": { "node": ">=22.13" },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.63.0",
+    "eslint": "10.12.0",
+    "globals": "17.13.0",
+    "html2canvas": "1.4.1",
+    "leaflet": "1.9.4"
+  }
+}

@@ -30,6 +30,29 @@
         summary: '',
         summaryStatus: 'neutral'
     };
+    let routeController = null;
+    let searchController = null;
+    let servicesPromise = null;
+
+    function getServices() {
+        if (!servicesPromise) {
+            servicesPromise = WebMapServices.requestJSON('config.json')
+                .then(WebMapServices.validateConfig)
+                .then(config => ({ ...config, search: WebMapServices.createSearchClient({ endpoint: config.searchUrl }) }))
+                .catch(error => {
+                    servicesPromise = null;
+                    throw error;
+                });
+        }
+        return servicesPromise;
+    }
+
+    function cancelRouteRequest() {
+        routeController?.abort();
+        routeController = null;
+        toggleRouteLoading(false);
+    }
+
     let currentMarkerFilter = 'all';
 
     // 主要都市の座標（定数）
@@ -83,7 +106,7 @@
             // OpenStreetMapタイルレイヤーを追加
             L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
-                attribution: '© OpenStreetMap contributors',
+                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>',
                 updateWhenIdle: true,
                 updateWhenZooming: false,
                 crossOrigin: true
@@ -152,6 +175,7 @@
         elements.markerList = document.getElementById('markerList');
         elements.closeMarkerManager = document.getElementById('closeMarkerManager');
         elements.exportMarkers = document.getElementById('exportMarkers');
+        elements.exportGeoJSON = document.getElementById('exportGeoJSON');
         elements.importMarkers = document.getElementById('importMarkers');
         elements.importFile = document.getElementById('importFile');
         elements.currentLocation = document.getElementById('currentLocation');
@@ -162,8 +186,8 @@
 
     // イベントリスナーの設定
     function setupEventListeners() {
-        // 地図イベント（デバウンス付き）
-        map.on('click', debounce(handleMapClick, 100));
+        // 各クリックを即時処理し、連続するルート・計測頂点を取りこぼさない。
+        map.on('click', handleMapClick);
         map.on('zoomend', updateZoomLevel);
 
         // ボタンイベント（イベント委譲）
@@ -171,8 +195,8 @@
 
         // 検索機能
         elements.searchButton.addEventListener('click', performSearch);
-        elements.addressInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') performSearch();
+        elements.addressInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.isComposing) performSearch();
         });
 
         // マーカーダイアログ
@@ -676,6 +700,7 @@
     // ルート選択モードの切り替え
     function setRouteSelectionMode(mode) {
         if (!map) return;
+        cancelRouteRequest();
 
         if (routeState.selectionMode === mode) {
             routeState.selectionMode = null;
@@ -781,67 +806,43 @@
         return marker;
     }
 
-    function requestRoute(auto = false) {
+    async function requestRoute(auto = false) {
         if (!map) return;
-
         if (!routeState.start || !routeState.end) {
-            if (!auto) {
-                setRouteResult('出発地と到着地を設定してください。', 'error');
-            }
+            if (!auto) setRouteResult('出発地と到着地を設定してください。', 'error');
             return;
         }
 
+        cancelRouteRequest();
+        const controller = new AbortController();
+        routeController = controller;
         toggleRouteLoading(true);
         setRouteResult('ルート取得中…');
+        const { start, end } = routeState;
 
-        const start = routeState.start;
-        const end = routeState.end;
-
-        const url = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson&alternatives=false&steps=false`;
-
-        fetch(url)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data?.code && data.code !== 'Ok') {
-                    throw new Error(`API応答コード: ${data.code}`);
-                }
-
-                const routes = data?.routes;
-                if (!Array.isArray(routes) || routes.length === 0) {
-                    throw new Error('ルートが見つかりませんでした');
-                }
-
-                const route = routes[0];
-                drawRouteGeometry(route.geometry);
-
-                const distanceText = formatDistance(route.distance);
-                const durationText = formatDuration(route.duration);
-                const summaryText = `距離: ${distanceText} / 所要時間: ${durationText}`;
-
-                setRouteResult(summaryText, 'success');
-
-                if (routeState.routeLayer) {
-                    try {
-                        map.fitBounds(routeState.routeLayer.getBounds(), { padding: [40, 40] });
-                    } catch (error) {
-                        console.error('ルートの表示調整エラー:', error);
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('ルート取得エラー:', error);
-                setRouteResult(`ルート取得に失敗しました: ${error.message}`, 'error');
-            })
-            .finally(() => {
+        try {
+            const services = await getServices();
+            if (routeController !== controller) return;
+            const url = `${services.routeUrl}/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson&alternatives=false&steps=false`;
+            const data = await WebMapServices.requestJSON(url, { signal: controller.signal });
+            if (routeController !== controller) return;
+            const route = WebMapServices.parseRoute(data);
+            drawRouteGeometry(route.geometry);
+            setRouteResult(`距離: ${formatDistance(route.distance)} / 所要時間: ${formatDuration(route.duration)}`, 'success');
+            map.fitBounds(routeState.routeLayer.getBounds(), { padding: [40, 40] });
+        } catch (error) {
+            if (routeController !== controller || error.name === 'AbortError') return;
+            clearRouteLayer();
+            console.error('ルート取得エラー:', error);
+            setRouteResult(`ルート取得に失敗しました: ${error.message}`, 'error');
+        } finally {
+            if (routeController === controller) {
+                routeController = null;
                 toggleRouteLoading(false);
                 routeState.selectionMode = null;
                 updateRouteButtons();
-            });
+            }
+        }
     }
 
     function drawRouteGeometry(geometry) {
@@ -874,6 +875,7 @@
 
     function clearRoute({ silent = false } = {}) {
         if (!map) return;
+        cancelRouteRequest();
 
         if (routeState.startMarker) {
             map.removeLayer(routeState.startMarker);
@@ -1192,15 +1194,17 @@
     }
 
     // 新規マーカーを作成
-    function createNewMarker(latlng, customData = {}) {
+    function createNewMarker(latlng, customData = {}, { register = true } = {}) {
+        // Detached markers let imports finish preparation before committing storage.
+        const usedIds = new Set(register ? markers.map(marker => marker.customData.id) : []);
         const rawId = Number(customData.id);
-        let markerId = Number.isFinite(rawId) && rawId > 0 ? rawId : null;
-
+        let markerId = Number.isSafeInteger(rawId) && rawId > 0 && (!register || !usedIds.has(rawId)) ? rawId : null;
         if (markerId == null) {
-            markerId = nextMarkerId++;
-        } else {
-            nextMarkerId = Math.max(nextMarkerId, markerId + 1);
+            if (!Number.isSafeInteger(nextMarkerId)) nextMarkerId = 1;
+            while (usedIds.has(nextMarkerId)) nextMarkerId += 1;
+            markerId = nextMarkerId;
         }
+        if (register) nextMarkerId = markerId < Number.MAX_SAFE_INTEGER ? markerId + 1 : 1;
 
         const iconType = getValidIconType(customData.iconType);
         const markerData = {
@@ -1213,14 +1217,17 @@
 
         const icon = createCustomIcon(markerData.iconType, markerData.title);
 
-        const marker = L.marker(latlng, { icon })
-            .addTo(map);
+        // Leaflet allows world copies; keep exported coordinates inside RFC 7946 bounds.
+        const longitude = latlng.lng >= -180 && latlng.lng <= 180
+            ? latlng.lng
+            : ((latlng.lng + 180) % 360 + 360) % 360 - 180;
+        const marker = L.marker(L.latLng(latlng.lat, longitude), { icon });
 
         // カスタムデータを保存
         marker.customData = {
             ...markerData,
             lat: latlng.lat,
-            lng: latlng.lng
+            lng: longitude
         };
 
         // ポップアップを設定
@@ -1231,6 +1238,9 @@
             openMarkerDialog(null, marker);
         });
 
+        if (!register) return marker;
+
+        marker.addTo(map);
         markers.push(marker);
 
         // ローカルストレージに保存
@@ -1241,6 +1251,7 @@
             refreshList: shouldRefreshList,
             updateSelect: false
         });
+        return marker;
     }
 
     // 既存マーカーを更新
@@ -1388,13 +1399,16 @@
     }
 
     // マーカーをローカルストレージに保存
-    function saveMarkersToStorage() {
+    function saveMarkersToStorage(markerList = markers) {
         try {
-            const markerData = markers.map(marker => marker.customData);
+            const markerData = markerList.map(marker => marker.customData);
             localStorage.setItem('webmap_markers', JSON.stringify(markerData));
             console.log('マーカーデータを保存しました:', markerData.length + '件');
+            return true;
         } catch (error) {
             console.error('マーカーデータの保存に失敗:', error);
+            alert('マーカーをブラウザに保存できませんでした。保存領域やブラウザの設定を確認してください。現在のマーカーはエクスポートで保存できます。');
+            return false;
         }
     }
 
@@ -1403,59 +1417,18 @@
         try {
             const savedData = localStorage.getItem('webmap_markers');
             if (savedData) {
-                const markerData = JSON.parse(savedData);
-                let maxId = 0;
-                markerData.forEach(data => {
-                    const latOk = Number.isFinite(Number(data.lat));
-                    const lngOk = Number.isFinite(Number(data.lng));
-                    if (latOk && lngOk && data.title) {
-                        const latlng = L.latLng(Number(data.lat), Number(data.lng));
-                        const parsedId = Number(data.id);
-                        let markerId;
-                        if (Number.isFinite(parsedId) && parsedId > 0) {
-                            markerId = parsedId;
-                            maxId = Math.max(maxId, markerId);
-                        } else {
-                            maxId += 1;
-                            markerId = maxId;
-                        }
-
-                        const iconType = getValidIconType(data.iconType);
-                        const markerDataNormalized = {
-                            ...data,
-                            id: markerId,
-                            iconType,
-                            emoji: MARKER_ICONS[iconType].emoji,
-                            title: data.title || ''
-                        };
-
-                        const icon = createCustomIcon(markerDataNormalized.iconType, markerDataNormalized.title);
-                        const marker = L.marker(latlng, { icon }).addTo(map);
-
-                        marker.customData = {
-                            ...markerDataNormalized,
-                            lat: latlng.lat,
-                            lng: latlng.lng
-                        };
-                        updateMarkerPopup(marker);
-
-                        marker.on('click', () => {
-                            openMarkerDialog(null, marker);
-                        });
-
-                        markers.push(marker);
-                    }
+                const markerData = WebMapData.normalizeMarkers(JSON.parse(savedData));
+                const prepared = markerData.map(data => createNewMarker(L.latLng(data.lat, data.lng), data, { register: false }));
+                prepared.forEach(marker => {
+                    marker.addTo(map);
+                    markers.push(marker);
                 });
-
-                // 次のIDを設定
-                if (maxId > 0) {
-                    nextMarkerId = Math.max(nextMarkerId, maxId + 1);
-                }
 
                 console.log('保存されたマーカーを読み込みました:', markers.length + '件');
             }
         } catch (error) {
             console.error('マーカーデータの読み込みに失敗:', error);
+            alert(`保存済みマーカーを読み込めませんでした。元の保存データは変更していません。${error.message}`);
         }
 
         applyMarkerFilter(currentMarkerFilter, {
@@ -1470,7 +1443,8 @@
         elements.closeMarkerManager.addEventListener('click', closeMarkerManager);
 
         // エクスポートボタン
-        elements.exportMarkers.addEventListener('click', exportMarkers);
+        elements.exportMarkers.addEventListener('click', () => exportMarkers());
+        elements.exportGeoJSON.addEventListener('click', () => exportMarkers('geojson'));
 
         // インポートボタン
         elements.importMarkers.addEventListener('click', () => {
@@ -1592,11 +1566,12 @@
     }
 
     // マーカーデータをエクスポート
-    function exportMarkers() {
+    function exportMarkers(format = 'json') {
         try {
             const markerData = markers.map(marker => marker.customData);
-            const dataStr = JSON.stringify(markerData, null, 2);
-            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const isGeoJSON = format === 'geojson';
+            const dataStr = JSON.stringify(isGeoJSON ? WebMapData.toGeoJSON(markerData) : markerData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: isGeoJSON ? 'application/geo+json' : 'application/json' });
 
             const now = new Date();
             const timestamp = now.getFullYear() +
@@ -1605,7 +1580,7 @@
                 ('0' + now.getHours()).slice(-2) +
                 ('0' + now.getMinutes()).slice(-2);
 
-            const filename = `webmap_markers_${timestamp}.json`;
+            const filename = `webmap_markers_${timestamp}.${isGeoJSON ? 'geojson' : 'json'}`;
 
             const url = URL.createObjectURL(dataBlob);
             const link = document.createElement('a');
@@ -1631,33 +1606,28 @@
         const reader = new FileReader();
         reader.onload = function(e) {
             try {
-                const importedData = JSON.parse(e.target.result);
+                const importedData = WebMapData.normalizeMarkers(JSON.parse(e.target.result));
+                const prepared = importedData.map(data => createNewMarker(L.latLng(data.lat, data.lng), data, { register: false }));
 
-                if (!Array.isArray(importedData)) {
-                    throw new Error('無効なファイル形式です');
-                }
-
-                // 既存マーカーをクリア
-                clearMarkers();
-
-                // インポートしたマーカーを作成
-                importedData.forEach(data => {
-                    const latOk = Number.isFinite(Number(data.lat));
-                    const lngOk = Number.isFinite(Number(data.lng));
-                    if (latOk && lngOk && data.title) {
-                        const latlng = L.latLng(Number(data.lat), Number(data.lng));
-                        createNewMarker(latlng, data);
-                    }
+                // Commit once. Validation or persistence failure leaves all existing markers intact.
+                if (!saveMarkersToStorage(prepared)) return;
+                markers.forEach(marker => map.removeLayer(marker));
+                markers.length = 0;
+                prepared.forEach(marker => {
+                    marker.addTo(map);
+                    markers.push(marker);
                 });
-
-                refreshMarkerList();
+                nextMarkerId = 1;
+                closeMarkerDialog();
+                applyMarkerFilter(currentMarkerFilter, { refreshList: true, updateSelect: true });
                 alert(`${importedData.length}件のマーカーをインポートしました。`);
 
             } catch (error) {
                 console.error('インポートエラー:', error);
-                alert('ファイルの読み込みに失敗しました。正しいJSONファイルを選択してください。');
+                alert(`インポートできませんでした。既存のマーカーは変更していません。${error.message}`);
             }
         };
+        reader.onerror = () => alert('ファイルを読み込めませんでした。既存のマーカーは変更していません。');
 
         reader.readAsText(file);
         event.target.value = ''; // ファイル選択をリセット
@@ -1743,70 +1713,25 @@
         }
     }
 
-    // 住所検索を実行（改良版：段階的検索）
+    // 明示的な検索ごとに1回送信し、以前の検索結果による上書きを防ぐ。
     async function performSearch() {
+        searchController?.abort();
+        const controller = new AbortController();
+        searchController = controller;
         const query = elements.addressInput.value.trim();
+        elements.searchResults.textContent = query ? '検索中…' : '';
         if (!query) return;
 
-        // 検索中の表示
-        elements.searchResults.innerHTML = '<div style="padding: 10px; color: #666;">検索中...</div>';
-
-        let allResults = [];
-
-        // 1. まず入力されたままで検索
         try {
-            const results1 = await searchAddress(query + ', Japan');
-            allResults = allResults.concat(results1);
+            const services = await getServices();
+            if (searchController !== controller) return;
+            const results = await services.search(query, { signal: controller.signal });
+            if (searchController === controller) displaySearchResults(results, query);
         } catch (error) {
-            console.error('検索エラー1:', error);
+            if (searchController !== controller || error.name === 'AbortError') return;
+            console.error('検索エラー:', error);
+            elements.searchResults.textContent = `検索に失敗しました: ${error.message}`;
         }
-
-        // 2. 結果が少ない場合、より広い範囲で検索
-        if (allResults.length < 3) {
-            try {
-                const results2 = await searchAddress(query);
-                // 重複を除く
-                results2.forEach(result => {
-                    if (!allResults.some(r => r.place_id === result.place_id)) {
-                        allResults.push(result);
-                    }
-                });
-            } catch (error) {
-                console.error('検索エラー2:', error);
-            }
-        }
-
-        // 3. まだ結果が少ない場合、部分一致を試す
-        if (allResults.length < 3 && query.length > 2) {
-            const parts = query.split(/[\s　,、]+/); // スペースやカンマで分割
-            for (let part of parts) {
-                if (part.length > 1) {
-                    try {
-                        const results3 = await searchAddress(part + ', Japan');
-                        results3.forEach(result => {
-                            if (!allResults.some(r => r.place_id === result.place_id)) {
-                                allResults.push(result);
-                            }
-                        });
-                    } catch (error) {
-                        console.error('部分検索エラー:', error);
-                    }
-                }
-                if (allResults.length >= 5) break;
-            }
-        }
-
-        // 結果を表示（最大5件）
-        displaySearchResults(allResults.slice(0, 5), query);
-    }
-
-    // 住所検索API呼び出し
-    function searchAddress(searchQuery) {
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=5&accept-language=ja&countrycodes=jp`;
-
-        return fetch(url)
-            .then(response => response.json())
-            .then(data => data || []);
     }
 
     // 検索結果を表示（改良版）
@@ -1917,19 +1842,6 @@
         }
 
         return thirdMesh + String(halfMeshCode);
-    }
-
-    // デバウンス関数
-    function debounce(func, wait) {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
     }
 
     // DOMContentLoadedで初期化

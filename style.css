@@ -14,11 +14,21 @@ body {
     height: 100vh;
 }
 
-.controls {
+.map-tools {
     position: absolute;
     top: 20px;
     left: 60px;
+    right: 20px;
     z-index: 1000;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    align-items: start;
+    gap: 16px;
+    pointer-events: none;
+}
+
+.controls {
+    pointer-events: auto;
     background: white;
     padding: 15px;
     border-radius: 8px;
@@ -180,6 +190,13 @@ body {
 }
 
 /* マーカー管理ダイアログ */
+.manager-note {
+    margin-bottom: 15px;
+    color: #555;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
 .marker-manager {
     max-width: 600px;
     max-height: 80vh;
@@ -187,6 +204,7 @@ body {
 
 .manager-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 10px;
     margin-bottom: 20px;
     justify-content: center;
@@ -348,15 +366,12 @@ body {
 
 /* 検索ボックス */
 .search-box {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    z-index: 1000;
+    pointer-events: auto;
     background: white;
     padding: 15px;
     border-radius: 8px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-    min-width: 300px;
+    min-width: 0;
 }
 
 .search-box input {
@@ -572,11 +587,26 @@ body {
 }
 
 /* モバイル対応 */
-@media (max-width: 600px) {
-    .controls {
+@media (max-width: 900px) {
+    .map-tools {
         top: 70px;
         left: 10px;
         right: 10px;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 10px;
+        max-height: 44vh;
+        overflow-y: auto;
+        pointer-events: auto;
+        border-radius: 8px;
+    }
+
+    .search-box {
+        order: -1;
+    }
+}
+
+@media (max-width: 600px) {
+    .controls {
         padding: 10px;
     }
 
@@ -587,13 +617,6 @@ body {
 
     .controls select {
         width: 100%;
-    }
-
-    .search-box {
-        top: 130px;
-        left: 10px;
-        right: 10px;
-        min-width: auto;
     }
 
     .info-panel {

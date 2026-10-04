@@ -9,8 +9,6 @@
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="alternate icon" type="image/png" href="favicon-32x32.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
     <link rel="manifest" href="manifest.json">
 
     <!-- Preconnect for performance -->
@@ -26,6 +24,7 @@
 <body>
     <div id="map"></div>
 
+    <div class="map-tools">
     <div class="controls">
         <button id="zoomToTokyo">東京</button>
         <button id="zoomToOsaka">大阪</button>
@@ -48,9 +47,10 @@
     </div>
 
     <div class="search-box">
-        <input type="text" id="addressInput" placeholder="住所を入力（例：東京駅、渋谷区、京都市役所）" />
+        <input type="text" id="addressInput" aria-label="住所検索" placeholder="住所を入力（例：東京駅、渋谷区、京都市役所）" />
         <button id="searchButton">検索</button>
-        <div id="searchResults"></div>
+        <div id="searchResults" aria-live="polite"></div>
+    </div>
     </div>
 
     <div class="info-panel">
@@ -65,15 +65,15 @@
     </div>
 
     <!-- マーカーカスタマイズダイアログ -->
-    <div id="markerDialog" class="marker-dialog">
+    <div id="markerDialog" class="marker-dialog" role="dialog" aria-modal="true" aria-label="マーカーの設定">
         <div class="dialog-content">
             <h3>マーカーの設定</h3>
             <div class="form-group">
-                <label>タイトル:</label>
+                <label for="markerTitle">タイトル:</label>
                 <input type="text" id="markerTitle" placeholder="マーカーのタイトルを入力" />
             </div>
             <div class="form-group">
-                <label>説明:</label>
+                <label for="markerDescription">説明:</label>
                 <textarea id="markerDescription" placeholder="マーカーの説明を入力（任意）"></textarea>
             </div>
             <div class="form-group">
@@ -99,14 +99,16 @@
     </div>
 
     <!-- マーカー管理ダイアログ -->
-    <div id="markerManagerDialog" class="marker-dialog">
+    <div id="markerManagerDialog" class="marker-dialog" role="dialog" aria-modal="true" aria-label="マーカー管理">
         <div class="dialog-content marker-manager">
             <h3>マーカー管理</h3>
             <div class="manager-actions">
-                <button id="exportMarkers" class="btn-secondary">📤 エクスポート</button>
+                <button id="exportMarkers" class="btn-secondary">📤 JSONエクスポート</button>
+                <button id="exportGeoJSON" class="btn-secondary">🌐 GeoJSONエクスポート</button>
                 <button id="importMarkers" class="btn-secondary">📥 インポート</button>
-                <input type="file" id="importFile" accept=".json" style="display: none;">
+                <input type="file" id="importFile" accept=".json,.geojson,application/json,application/geo+json" style="display: none;">
             </div>
+            <p class="manager-note">インポートすると保存地点をすべて置き換えます。以前の地点を残すには、先にエクスポートしてください。</p>
 
             <div id="markerList" class="marker-list">
                 <!-- マーカーリストがここに表示される -->
@@ -124,7 +126,9 @@
     <!-- HTML2Canvas for screenshot -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
-    <!-- Custom JavaScript with async -->
+    <!-- Deferred scripts execute in dependency order. -->
+    <script src="marker-data.js" defer></script>
+    <script src="map-services.js" defer></script>
     <script src="map.js" defer></script>
 </body>
 </html>
